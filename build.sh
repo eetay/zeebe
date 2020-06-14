@@ -37,7 +37,7 @@ fi
 function build {
 	java -version
 	mvn -version
-	mvn $MVN_OPTS clean package -e -Djava.version=11 -Dmaven.test.skip=true
+	mvn $MVN_OPTS clean package -e -Dmaven.test.skip=true
 }
 
 function tagAndDeploy {
