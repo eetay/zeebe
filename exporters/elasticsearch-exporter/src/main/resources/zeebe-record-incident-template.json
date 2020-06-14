@@ -1,6 +1,7 @@
 {
   "index_patterns": [
-    "zeebe-record_incident_*"
+    "zeebe-record_incident_*",
+    "zeebe232h-record_incident_0.23.2_*"
   ],
   "order": 20,
   "aliases": {
@@ -16,6 +17,9 @@
               "type": "keyword"
             },
             "errorMessage": {
+              "type": "text"
+            },
+            "errorCategory": {
               "type": "text"
             },
             "bpmnProcessId": {

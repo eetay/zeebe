@@ -135,7 +135,9 @@ public final class CreateWorkflowInstanceProcessor
     newWorkflowInstance.setBpmnElementType(BpmnElementType.PROCESS);
     newWorkflowInstance.setElementId(workflow.getWorkflow().getId());
     newWorkflowInstance.setFlowScopeKey(-1);
-
+    // EETAY: add variable here from this.variablesState
+    // ./engine/src/main/java/io/zeebe/engine/state/instance/VariablesState.java
+    // this.variablesState.getVariables....:
     final ElementInstance instance =
         elementInstanceState.newInstance(
             workflowInstanceKey, newWorkflowInstance, WorkflowInstanceIntent.ELEMENT_ACTIVATING);

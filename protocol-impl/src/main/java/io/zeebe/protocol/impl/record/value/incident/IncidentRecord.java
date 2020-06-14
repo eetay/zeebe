@@ -11,19 +11,24 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.zeebe.msgpack.property.EnumProperty;
 import io.zeebe.msgpack.property.LongProperty;
 import io.zeebe.msgpack.property.StringProperty;
+import io.zeebe.msgpack.value.StringValue;
 import io.zeebe.protocol.impl.record.UnifiedRecordValue;
 import io.zeebe.protocol.impl.record.value.workflowinstance.WorkflowInstanceRecord;
 import io.zeebe.protocol.record.value.ErrorType;
 import io.zeebe.protocol.record.value.IncidentRecordValue;
 import io.zeebe.protocol.record.value.WorkflowInstanceRelated;
 import io.zeebe.util.buffer.BufferUtil;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.agrona.DirectBuffer;
 
 public final class IncidentRecord extends UnifiedRecordValue
     implements WorkflowInstanceRelated, IncidentRecordValue {
+  private final Pattern pattern = Pattern.compile("category: ?([^ ]*?) ");
   private final EnumProperty<ErrorType> errorTypeProp =
       new EnumProperty<>("errorType", ErrorType.class, ErrorType.UNKNOWN);
   private final StringProperty errorMessageProp = new StringProperty("errorMessage", "");
+  private final StringProperty errorCategoryProp = new StringProperty("errorCategory", "");
 
   private final StringProperty bpmnProcessIdProp = new StringProperty("bpmnProcessId", "");
   private final LongProperty workflowKeyProp = new LongProperty("workflowKey", -1L);
@@ -36,6 +41,7 @@ public final class IncidentRecord extends UnifiedRecordValue
   public IncidentRecord() {
     this.declareProperty(errorTypeProp)
         .declareProperty(errorMessageProp)
+        .declareProperty(errorCategoryProp)
         .declareProperty(bpmnProcessIdProp)
         .declareProperty(workflowKeyProp)
         .declareProperty(workflowInstanceKeyProp)
@@ -47,7 +53,7 @@ public final class IncidentRecord extends UnifiedRecordValue
 
   public void wrap(final IncidentRecord record) {
     errorTypeProp.setValue(record.getErrorType());
-    errorMessageProp.setValue(record.getErrorMessage());
+    setErrorMessage(record.getErrorMessage());
     bpmnProcessIdProp.setValue(record.getBpmnProcessIdBuffer());
     workflowKeyProp.setValue(record.getWorkflowKey());
     workflowInstanceKeyProp.setValue(record.getWorkflowInstanceKey());
@@ -88,6 +94,11 @@ public final class IncidentRecord extends UnifiedRecordValue
   @Override
   public ErrorType getErrorType() {
     return errorTypeProp.getValue();
+  }
+
+  // EETAY @Override
+  public String getErrorCategory() {
+    return BufferUtil.bufferAsString(errorCategoryProp.getValue());
   }
 
   @Override
@@ -152,12 +163,27 @@ public final class IncidentRecord extends UnifiedRecordValue
   }
 
   public IncidentRecord setErrorMessage(final DirectBuffer errorMessage) {
-    this.errorMessageProp.setValue(errorMessage);
-    return this;
+    try {
+      final StringValue v = new StringValue(errorMessage);
+      final String s = v.toString();
+      System.out.println(s);
+      return this.setErrorMessage(s);
+    } catch (Exception e) {
+      System.out.println(e);
+      this.errorMessageProp.setValue(errorMessage);
+      this.errorCategoryProp.setValue(e.toString());
+      return this;
+    }
   }
 
   public IncidentRecord setErrorMessage(final String errorMessage) {
     this.errorMessageProp.setValue(errorMessage);
+    final Matcher matcher = this.pattern.matcher(errorMessage);
+    if (matcher.find()) {
+      this.errorCategoryProp.setValue(matcher.group(1));
+    } else {
+      this.errorCategoryProp.setValue("unknown");
+    }
     return this;
   }
 
