@@ -1,33 +1,55 @@
-#!/bin/bash -x
-COMMIT=`git rev-parse --short HEAD`
+#!/bin/bash
+
+BUILD_NUMBER=${bamboo_buildNumber:-0}
+BUILD_COMMIT=$(git rev-parse --short HEAD)
+BUILD_REPO=zeebe-broker
 BUILD_BRANCH=`git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/\1/'`
 BUILD_BRANCH_FOR_DOCKER=`echo $BUILD_BRANCH | tr '/' '_'`
-TAG=$BUILD_BRANCH_FOR_DOCKER-$COMMIT
-FULL_NAME_REMOTE=712823164894.dkr.ecr.us-east-2.amazonaws.com/zeebe-broker:$TAG
+BUILD_REGISTRY=712823164894.dkr.ecr.us-east-2.amazonaws.com
+BUILD_IMAGE_TAG=${BUILD_NUMBER}-${BUILD_BRANCH_FOR_DOCKER}-${BUILD_COMMIT}
+BUILD_IMAGE_NAME=$BUILD_REPO
+BUILD_IMAGE_FULL_NAME=${BUILD_IMAGE_NAME}:${BUILD_IMAGE_TAG}
+DEPLOY_IMAGE_FULL_NAME=${BUILD_REGISTRY}/${BUILD_IMAGE_FULL_NAME}
+DEPLOY_TARGETS=${bamboo_DEPLOY_TARGETS}
+DEPLOY_ACCESS_SECRET_KEY=${bamboo_DEPLOY_ACCESS_SECRET_KEY}
+DEPLOY_ACCESS_FILE=~/.ssh/id_rsa
+if [ -n "${bamboo_AWS_ACCESS_KEY_ID}" ]; then
+    export AWS_ACCESS_KEY_ID=${bamboo_AWS_ACCESS_KEY_ID}
+    export AWS_SECRET_ACCESS_KEY=${bamboo_AWS_SECRET_ACCESS_KEY}
+fi
+export AWS_REGION=us-east-2
+set -x
 
-sudo apt update
-sudo apt-get -y install openjdk-11-jdk
-sudo apt-get -y upgrade maven
-java -version
-unset M2_HOME
-export M3_HOME=/usr/share/maven
-which mvn
-ls -la `which mvn`
-/usr/bin/mvn -version
+if [ -n "$bamboo_buildNumber" ]; then
+	export DEBIAN_FRONTEND=noninteractive
+	sudo add-apt-repository ppa:openjdk-r/ppa
+	sudo apt update
+	sudo apt-get -y install openjdk-11-jdk
+	export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+	sudo apt-get -y upgrade maven
+	unset M2_HOME
+	export M3_HOME=/usr/share/maven
+	export MAVEN_HOME=/usr/share/maven
+	export PATH=/usr/bin:$PATH
+	MVN_OPTS=-B
+fi
 
 function build {
 	java -version
 	mvn -version
-	echo "MAVEN__HOME=$MAVEN_HOME"
-	mvn clean package -e -Dmaven.test.skip=true -Dmaven.repo.remote=https://repo1.maven.org/maven2/org/camunda/camunda-release-parent,https://app.camunda.com/nexus/content/repositories/camunda-bpm,https://app.camunda.com/nexus/content/repositories/zeebe-io,https://repo.maven.apache.org/maven2
+	mvn $MVN_OPTS clean package -e -Djava.version=11 -Dmaven.test.skip=true
 }
 
 function tagAndDeploy {
 	LOGINCMD=$(aws ecr get-login --region $AWS_REGION --no-include-email | sed 's|https://||')
 	eval $LOGINCMD
-	docker build --no-cache --build-arg DISTBALL=dist/target/zeebe-distribution-*.tar.gz -t zeebe-broker:$TAG -t $FULL_NAME_REMOTE . #--target app .
-	docker push $FULL_NAME_REMOTE
+	docker build --no-cache --build-arg DISTBALL=dist/target/zeebe-distribution-*.tar.gz -t $BUILD_IMAGE_FULL_NAME -t $DEPLOY_IMAGE_FULL_NAME . #--target app .
+	docker push $DEPLOY_IMAGE_FULL_NAME
+	echo $DEPLOY_IMAGE_FULL_NAME
 }
+
+echo "#### BUILD VARS ####"
+( set -o posix ; set ) | egrep "^BUILD|^DEPLOY|^AWS" | grep -v SECRET
 
 build || exit 1
 tagAndDeploy
