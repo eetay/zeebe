@@ -22,6 +22,7 @@ set -x
 
 if [ -n "$bamboo_buildNumber" ]; then
 	export DEBIAN_FRONTEND=noninteractive
+	echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
 	sudo add-apt-repository ppa:openjdk-r/ppa
 	sudo apt update
 	sudo apt-get -y install openjdk-11-jdk
@@ -30,7 +31,7 @@ if [ -n "$bamboo_buildNumber" ]; then
 	unset M2_HOME
 	export M3_HOME=/usr/share/maven
 	export MAVEN_HOME=/usr/share/maven
-	export PATH=/usr/bin:$PATH
+	export PATH=/usr/bin:$PATH  # Override all /opt installations
 	MVN_OPTS=-B
 fi
 
