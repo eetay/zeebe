@@ -41,6 +41,7 @@
     <module>exporter-api</module>
     <module>protocol-asserts</module>
     <module>exporters/elasticsearch-exporter</module>
+    <module>exporters/kudu-exporter</module>
     <module>protocol-impl</module>
     <module>zb-db</module>
     <module>upgrade-tests</module>

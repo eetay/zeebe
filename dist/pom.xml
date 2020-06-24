@@ -35,6 +35,11 @@
 
     <dependency>
       <groupId>io.zeebe</groupId>
+      <artifactId>zeebe-kudu-exporter</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.zeebe</groupId>
       <artifactId>zeebe-util</artifactId>
     </dependency>
 
@@ -215,6 +220,7 @@
           <!-- dependencies only packaged but not explicitly used -->
           <usedDependencies>
             <dependency>io.zeebe:zeebe-elasticsearch-exporter</dependency>
+            <dependency>io.zeebe:zeebe-kudu-exporter</dependency>
           </usedDependencies>
         </configuration>
       </plugin>

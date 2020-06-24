@@ -167,6 +167,12 @@
 
       <dependency>
         <groupId>io.zeebe</groupId>
+        <artifactId>zeebe-kudu-exporter</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>io.zeebe</groupId>
         <artifactId>zeebe-protocol-asserts</artifactId>
         <version>${project.version}</version>
       </dependency>
