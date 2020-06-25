@@ -5,7 +5,13 @@ BUILD_COMMIT=$(git rev-parse --short HEAD)
 BUILD_REPO=zeebe-broker
 BUILD_BRANCH=`git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/\1/'`
 BUILD_BRANCH_FOR_DOCKER=`echo $BUILD_BRANCH | tr '/' '_'`
-BUILD_REGISTRY=712823164894.dkr.ecr.us-east-2.amazonaws.com
+
+if [ "${bamboo_DOCKER_PUSH_TARGET}" == "AWS" ]; then
+	BUILD_REGISTRY=712823164894.dkr.ecr.us-east-2.amazonaws.com
+else
+	BUILD_REGISTRY="registry.ahanet.net:5000/ops"
+fi
+
 BUILD_IMAGE_TAG=${BUILD_NUMBER}-${BUILD_BRANCH_FOR_DOCKER}-${BUILD_COMMIT}
 BUILD_IMAGE_NAME=$BUILD_REPO
 BUILD_IMAGE_FULL_NAME=${BUILD_IMAGE_NAME}:${BUILD_IMAGE_TAG}
@@ -42,8 +48,12 @@ function build {
 }
 
 function tagAndDeploy {
-	LOGINCMD=$(aws ecr get-login --region $AWS_REGION --no-include-email | sed 's|https://||')
-	eval $LOGINCMD
+	if [ "${bamboo_DOCKER_PUSH_TARGET}" == "AWS" ]; then
+		LOGINCMD=$(aws ecr get-login --region $AWS_REGION --no-include-email | sed 's|https://||')
+		eval $LOGINCMD
+	else
+		docker login -u ${bamboo_AHANET_REGISTRY_USER} -p ${bamboo_AHANET_REGISTRY_PASSWORD} $BUILD_REGISTRY
+	fi
 	docker build --no-cache --build-arg DISTBALL=dist/target/zeebe-distribution-*.tar.gz -t $BUILD_IMAGE_FULL_NAME -t $DEPLOY_IMAGE_FULL_NAME . #--target app .
 	docker push $DEPLOY_IMAGE_FULL_NAME
 	echo $DEPLOY_IMAGE_FULL_NAME
