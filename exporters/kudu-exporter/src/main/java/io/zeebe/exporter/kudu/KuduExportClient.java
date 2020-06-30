@@ -79,9 +79,43 @@ public class KuduExportClient {
     }
   }
 
+  private void updateRowForInstace(
+      final Record<?> record, WorkflowInstanceRecordValue value, String status, String vin) {
+    log.info(
+        "Received event with intent "
+            + record.getIntent()
+            + " from instance: "
+            + value.getWorkflowInstanceKey()
+            + " with status: "
+            + status);
+
+    final PartialRow row = table.getSchema().newPartialRow();
+    final Update update = table.newUpdate();
+    row.addString("bpmnprocessid", value.getBpmnProcessId());
+    row.addString("status", status);
+    row.addLong("lastupdatets", record.getTimestamp());
+    row.addLong("workflowinstanceid", value.getWorkflowInstanceKey());
+    row.addString("vin", vin);
+
+    if (status.contains(COMPLETED)) {
+      row.addLong("endts", record.getTimestamp());
+    }
+
+    update.setRow(row);
+
+    try {
+      session.apply(update);
+    } catch (KuduException ke) {
+      log.error("Exception when applying insert on session", ke);
+    }
+  }
+
   public void store(final Record<?> record) {
     if (record.getValue() instanceof WorkflowInstanceRecordValue) {
       final WorkflowInstanceRecordValue value = (WorkflowInstanceRecordValue) record.getValue();
+      final WorkflowDetails vinStatus = workflowToVinMap.get(value.getWorkflowInstanceKey());
+      final String vin =
+          (vinStatus != null && vinStatus.getVin() != null) ? vinStatus.getVin() : "DUMMY_VIN";
       if (value.getBpmnElementType().equals(BpmnElementType.PROCESS)) {
         if (record.getIntent().equals(WorkflowInstanceIntent.ELEMENT_ACTIVATED)) {
           // TODO: Insert into workflows table from here when we have VIN in workflowinstancerecord
@@ -93,23 +127,14 @@ public class KuduExportClient {
               "Created workflow instance entry in map for workflow instance key "
                   + value.getWorkflowInstanceKey());
         } else if (record.getIntent().equals(WorkflowInstanceIntent.ELEMENT_COMPLETED)) {
-          log.info("Received complete for workflow instance key " + value.getWorkflowInstanceKey());
-          final WorkflowDetails vinStatus = workflowToVinMap.get(value.getWorkflowInstanceKey());
-          final String vin = vinStatus.getVin() != null ? vinStatus.getVin() : "DUMMY_VIN";
-          final PartialRow row = table.getSchema().newPartialRow();
-          final Update update = table.newUpdate();
-          row.addString("bpmnprocessid", value.getBpmnProcessId());
-          row.addString("status", vinStatus.isError() ? COMPLETED_W_ERROR : COMPLETED);
-          row.addLong("endts", record.getTimestamp());
-          row.addLong("lastupdatets", record.getTimestamp());
-          row.addLong("workflowinstanceid", value.getWorkflowInstanceKey());
-          row.addString("vin", vin);
-          update.setRow(row);
-          try {
-            session.apply(update);
-          } catch (KuduException ke) {
-            log.error("Exception when applying insert on session", ke);
-          }
+          final String status = vinStatus.isError() ? COMPLETED_W_ERROR : COMPLETED;
+          updateRowForInstace(record, value, status, vin);
+        }
+      } else if (value.getBpmnElementType().equals(BpmnElementType.RECEIVE_TASK)) {
+        if (record.getIntent().equals(WorkflowInstanceIntent.ELEMENT_ACTIVATED)) {
+          updateRowForInstace(record, value, WAITING, vin);
+        } else if (record.getIntent().equals(WorkflowInstanceIntent.ELEMENT_COMPLETED)) {
+          updateRowForInstace(record, value, RUNNING, vin);
         }
       }
     } else if (record.getValueType() == ValueType.JOB) {
@@ -164,22 +189,6 @@ public class KuduExportClient {
         if ((value.getErrorCode() != null) && !value.getErrorCode().isEmpty()) {
           wfDetails.setErrorCode(value.getErrorCode());
           wfDetails.setErrorMessage(value.getErrorMessage());
-        }
-      } else if ((value.getElementId().contains("wait") || value.getElementId().contains("Wait"))
-          && (wfDetails.getVin() != null)) {
-        // update status as waiting
-        final PartialRow row = table.getSchema().newPartialRow();
-        final Update update = table.newUpdate();
-        row.addString("bpmnprocessId", value.getBpmnProcessId());
-        row.addLong("lastupdatets", record.getTimestamp());
-        row.addLong("workflowinstanceid", value.getWorkflowInstanceKey());
-        row.addString("vin", wfDetails.getVin());
-        row.addString("status", WAITING);
-        update.setRow(row);
-        try {
-          session.apply(update);
-        } catch (KuduException ke) {
-          log.error("Exception when applying update on session", ke);
         }
       }
       // update error state if we have error info
