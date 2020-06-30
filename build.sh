@@ -1,5 +1,6 @@
 #!/bin/bash
 
+DOCKER_CMD=${DOCKER_CMD:-'docker'}
 BUILD_NUMBER=${bamboo_buildNumber:-0}
 BUILD_COMMIT=$(git rev-parse --short HEAD)
 BUILD_REPO=zeebe-broker
@@ -52,10 +53,10 @@ function tagAndDeploy {
 		LOGINCMD=$(aws ecr get-login --region $AWS_REGION --no-include-email | sed 's|https://||')
 		eval $LOGINCMD
 	else
-		docker login -u ${bamboo_AHANET_REGISTRY_USER} -p ${bamboo_AHANET_REGISTRY_PASSWORD} $BUILD_REGISTRY
+		$DOCKER_CMD login -u ${bamboo_AHANET_REGISTRY_USER} -p ${bamboo_AHANET_REGISTRY_PASSWORD} $BUILD_REGISTRY
 	fi
-	docker build --no-cache --build-arg DISTBALL=dist/target/zeebe-distribution-*.tar.gz -t $BUILD_IMAGE_FULL_NAME -t $DEPLOY_IMAGE_FULL_NAME . #--target app .
-	docker push $DEPLOY_IMAGE_FULL_NAME
+	$DOCKER_CMD build --no-cache --build-arg DISTBALL=dist/target/zeebe-distribution-*.tar.gz -t $BUILD_IMAGE_FULL_NAME -t $DEPLOY_IMAGE_FULL_NAME . #--target app .
+	$DOCKER_CMD push $DEPLOY_IMAGE_FULL_NAME
 	echo $DEPLOY_IMAGE_FULL_NAME
 }
 
