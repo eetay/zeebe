@@ -34,6 +34,7 @@ public class KuduExportClient {
   private static final String WAITING = "WAITING";
   private static final String COMPLETED = "COMPLETED";
   private static final String COMPLETED_W_ERROR = "COMPLETED_W_ERROR";
+  private static final String TERMINATED = "TERMINATED";
   private static final String AUTOMATIC = "AUTOMATIC";
   private static final String RUNNING = "RUNNING";
   protected final KuduClient client;
@@ -129,6 +130,8 @@ public class KuduExportClient {
         } else if (record.getIntent().equals(WorkflowInstanceIntent.ELEMENT_COMPLETED)) {
           final String status = vinStatus.isError() ? COMPLETED_W_ERROR : COMPLETED;
           updateRowForInstace(record, value, status, vin);
+        } else if (record.getIntent().equals(WorkflowInstanceIntent.ELEMENT_TERMINATED)) {
+          updateRowForInstace(record, value, TERMINATED, vin);
         }
       } else if (value.getBpmnElementType().equals(BpmnElementType.RECEIVE_TASK)) {
         if (record.getIntent().equals(WorkflowInstanceIntent.ELEMENT_ACTIVATED)) {
